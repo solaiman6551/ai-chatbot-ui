@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 const SESSION_ID = 'user_' + Math.random().toString(36).substr(2, 9);
 const SYSTEM_PROMPT = `You are Aria, a professional and empathetic customer support agent for a SaaS company called NexaSupport. You help with billing, accounts, and subscriptions. Always be concise, friendly, and end with a clear next step.`;
@@ -9,6 +9,11 @@ function App() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+}, [messages]);
 
 const sendMessage = async () => {
   if (!input.trim() || loading) return;
@@ -110,6 +115,7 @@ const sendMessage = async () => {
             </div>
           </div>
         )}
+         <div ref={messagesEndRef} />
       </div>
 
       <div style={{ padding: '16px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: '10px' }}>
