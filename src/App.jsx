@@ -41,6 +41,12 @@ function App() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
+  const formatMessage = (text) => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br/>');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxWidth: '720px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
 
@@ -60,12 +66,13 @@ function App() {
               padding: '10px 14px',
               fontSize: '14px',
               lineHeight: '1.6',
+              textAlign: 'left',
               background: msg.role === 'user' ? '#6c8cff' : '#f3f4f6',
               color: msg.role === 'user' ? 'white' : '#111827',
               borderRadius: msg.role === 'user' ? '12px 2px 12px 12px' : '2px 12px 12px 12px',
-            }}>
-              {msg.content}
-            </div>
+            }}
+              dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
+            />
           </div>
         ))}
         {loading && (
