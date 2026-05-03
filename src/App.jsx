@@ -5,11 +5,10 @@ const AGENTS = [
   {
     id: 'aria',
     name: 'Aria',
-    role: 'Billing & Accounts',
+    role: 'Client Communication',
     color: '#6c8cff',
     initial: 'A',
-    systemPrompt: `You are Aria, a professional and empathetic customer support agent for a SaaS company called NexaSupport. You help with billing, accounts, and subscriptions. Always be concise, friendly, and end with a clear next step.`,
-    greeting: "Hi! I'm Aria, your billing & accounts specialist. How can I help you today?"
+    greeting: "Hi! I'm Aria, your client communication specialist. Need to send a professional email or manage a client relationship? I'm here to help!"
   },
   {
     id: 'rex',
@@ -17,17 +16,15 @@ const AGENTS = [
     role: 'Tech Support',
     color: '#10b981',
     initial: 'R',
-    systemPrompt: `You are Rex, a friendly and knowledgeable tech support specialist for NexaSupport. You help with technical issues, bugs, integrations, and API questions. Be clear, patient, and always provide step-by-step solutions.`,
     greeting: "Hey! I'm Rex, your tech support specialist. What technical issue can I help you solve today?"
   },
   {
     id: 'mila',
     name: 'Mila',
-    role: 'Orders & Returns',
+    role: 'Invoice Generator',
     color: '#f472b6',
     initial: 'M',
-    systemPrompt: `You are Mila, a warm and efficient orders & returns specialist for NexaSupport. You help with order tracking, returns, refunds, and shipping issues. Always be empathetic and provide clear timelines.`,
-    greeting: "Hello! I'm Mila, your orders & returns specialist. How can I assist you today?"
+    greeting: "Hello! I'm Mila, your invoice generator. Just tell me the details and I'll create a professional PDF invoice instantly!\n\nExample:\n\"Invoice for Ahmed, React dashboard $150, SEO setup $50, due in 7 days, my name is Solaiman\""
   }
 ];
 
@@ -58,6 +55,7 @@ function App() {
 
     const userMessage = { role: 'user', content: input };
     const currentAgentId = activeAgent.id;
+
     setAllMessages(prev => ({
       ...prev,
       [currentAgentId]: [...prev[currentAgentId], userMessage]
@@ -65,53 +63,37 @@ function App() {
     setInput('');
     setLoading(true);
 
-    const aiMessage = { role: 'assistant', content: '' };
     setAllMessages(prev => ({
       ...prev,
-      [currentAgentId]: [...prev[currentAgentId], aiMessage]
+      [currentAgentId]: [...prev[currentAgentId], { role: 'assistant', content: '' }]
     }));
 
     try {
+      const history = allMessages[currentAgentId]
+        .filter(m => m.content !== AGENTS.find(a => a.id === currentAgentId).greeting)
+        .map(({ role, content }) => ({ role, content })) // strip downloadUrl
+        .concat(userMessage);
+
       const res = await fetch('http://localhost:3000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: input,
-          sessionId: currentAgentId,
-          systemPrompt: activeAgent.systemPrompt,
-        }),
+        body: JSON.stringify({ agent: currentAgentId, messages: history }),
       });
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
+      const data = await res.json();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      // Check if Mila generated an invoice
+      const invoiceTool = data.toolsUsed?.find(t => t.tool === 'generate_invoice');
+      const downloadUrl = invoiceTool?.result?.success ? invoiceTool.result.download_url : null;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+      setAllMessages(prev => ({
+        ...prev,
+        [currentAgentId]: [
+          ...prev[currentAgentId].slice(0, -1),
+          { role: 'assistant', content: data.reply, downloadUrl }
+        ]
+      }));
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') break;
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.text) {
-                aiMessage.content += parsed.text;
-                setAllMessages(prev => ({
-                  ...prev,
-                  [currentAgentId]: [
-                    ...prev[currentAgentId].slice(0, -1),
-                    { ...aiMessage }
-                  ]
-                }));
-              }
-            } catch { }
-          }
-        }
-      }
     } catch (err) {
       setAllMessages(prev => ({
         ...prev,
@@ -130,11 +112,13 @@ function App() {
   };
 
   const formatMessage = (text) => {
+    if (!text) return '';
     return text
-      .replace(/^## (.*?)$/gm, '<strong>$1</strong>')
+      .replace(/```(\w+)?\n?([\s\S]*?)```/g, '<pre style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;overflow-x:auto;font-size:13px;margin:8px 0"><code>$2</code></pre>')
+      .replace(/`([^`]+)`/g, '<code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:13px;color:#e83e8c">$1</code>')
+      .replace(/^## (.*?)$/gm, '<strong style="font-size:15px">$1</strong>')
       .replace(/^### (.*?)$/gm, '<strong>$1</strong>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`(.*?)`/g, '<code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:13px">$1</code>')
       .replace(/\n/g, '<br/>');
   };
 
@@ -172,25 +156,66 @@ function App() {
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {messages.map((msg, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-            {msg.role === 'assistant' && msg.content === '' ? (
-              <div className="typing-bubble" style={{ minHeight: '37px', minWidth: '60px' }}>
-                <span></span>
-                <span></span>
-                <span></span>
+          <div key={i}>
+            {/* Rex web search badge */}
+            {msg.role === 'assistant' && activeAgent.id === 'rex' && msg.content && i > 0 && (
+              <div style={{ fontSize: '11px', color: '#10b981', marginBottom: '4px', paddingLeft: '4px' }}>
+                🔍 Searched the web
               </div>
-            ) : (
-              <div style={{
-                maxWidth: '75%', padding: '10px 14px', fontSize: '14px', lineHeight: '1.6', textAlign: 'left',
-                background: msg.role === 'user' ? activeAgent.color : '#f3f4f6',
-                color: msg.role === 'user' ? 'white' : '#111827',
-                borderRadius: msg.role === 'user' ? '12px 2px 12px 12px' : '2px 12px 12px 12px',
-              }}
-                dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
-              />
             )}
+            {/* Mila invoice badge */}
+            {msg.role === 'assistant' && activeAgent.id === 'mila' && msg.downloadUrl && (
+              <div style={{ fontSize: '11px', color: '#f472b6', marginBottom: '4px', paddingLeft: '4px' }}>
+                🧾 Invoice generated
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              {msg.role === 'assistant' && msg.content === '' ? (
+                <div className="typing-bubble" style={{ minHeight: '37px', minWidth: '60px' }}>
+                  <span></span><span></span><span></span>
+                </div>
+              ) : (
+                <div style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{
+                    padding: '10px 14px', fontSize: '14px', lineHeight: '1.6', textAlign: 'left',
+                    background: msg.role === 'user' ? activeAgent.color : '#f3f4f6',
+                    color: msg.role === 'user' ? 'white' : '#111827',
+                    borderRadius: msg.role === 'user' ? '12px 2px 12px 12px' : '2px 12px 12px 12px',
+                  }}
+                    dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
+                  />
+                  {/* Download button for Mila's invoices */}
+                  {msg.downloadUrl && (
+                    <a
+                      href={msg.downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                        padding: '8px 16px', background: '#f472b6', color: 'white',
+                        borderRadius: '8px', textDecoration: 'none', fontSize: '13px',
+                        fontWeight: '600', width: 'fit-content',
+                        boxShadow: '0 2px 8px rgba(244,114,182,0.4)',
+                      }}
+                    >
+                      📄 Download Invoice PDF
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         ))}
+        {loading && activeAgent.id === 'rex' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#6b7280', paddingLeft: '4px' }}>
+            <span>🔍</span><span>Rex is searching the web...</span>
+          </div>
+        )}
+        {loading && activeAgent.id === 'mila' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#6b7280', paddingLeft: '4px' }}>
+            <span>🧾</span><span>Mila is generating your invoice...</span>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -206,7 +231,7 @@ function App() {
         <button
           onClick={sendMessage}
           disabled={loading}
-          style={{ padding: '10px 20px', background: activeAgent.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', fontWeight: '500' }}
+          style={{ padding: '10px 20px', background: activeAgent.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', fontWeight: '500', opacity: loading ? 0.6 : 1 }}
         >
           Send
         </button>

@@ -1,0 +1,110 @@
+/* Add to your main CSS file or a SearchActivity.css */
+
+.search-activity {
+  margin: 8px 0 4px;
+  border: 1px solid #2a2a3e;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 13px;
+  background: #0f0f1a;
+}
+
+.search-activity-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: #8b8bff;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.search-activity-toggle:hover {
+  background: #1a1a2e;
+}
+
+.search-icon {
+  font-size: 14px;
+}
+
+.chevron {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.search-results-panel {
+  border-top: 1px solid #2a2a3e;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-query-block {
+  background: #13132a;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.search-query-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.search-q-num {
+  font-size: 11px;
+  color: #555580;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.search-query-text {
+  background: #1e1e3a;
+  color: #a0a0ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "Fira Code", monospace;
+}
+
+.search-result-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-result-item a {
+  color: #6a9eff;
+  font-weight: 500;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.search-result-item a:hover {
+  text-decoration: underline;
+}
+
+.search-result-desc {
+  color: #666688;
+  margin: 0;
+  line-height: 1.4;
+  font-size: 12px;
+}
+
+.search-error {
+  color: #ff6b6b;
+  font-size: 12px;
+  margin: 0;
+}
